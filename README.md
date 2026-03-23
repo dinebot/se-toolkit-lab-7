@@ -91,3 +91,75 @@ By the end of this lab, you should be able to say:
 2. [Backend Integration](./lab/tasks/required/task-2.md) — P0: slash commands + real data
 3. [Intent-Based Natural Language Routing](./lab/tasks/required/task-3.md) — P1: LLM tool use
 4. [Containerize and Document](./lab/tasks/required/task-4.md) — P3: containerize + deploy
+
+## Deploy
+
+This section explains how to deploy the bot alongside the backend using Docker.
+
+### Prerequisites
+
+- Docker and Docker Compose installed on your VM
+- `.env.docker.secret` configured with bot credentials
+
+### Required environment variables
+
+The following variables must be set in `.env.docker.secret`:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `BOT_TOKEN` | Telegram bot token from @BotFather | `6770332647:AAF...` |
+| `LMS_API_URL` | Backend URL (use `http://backend:8000` inside Docker) | `http://backend:8000` |
+| `LMS_API_KEY` | API key for backend authentication | `my-secret-api-key` |
+| `LLM_API_KEY` | API key for LLM service | `my-secret-qwen-key` |
+| `LLM_API_BASE_URL` | LLM API URL (use `host.docker.internal` to reach host) | `http://host.docker.internal:42005/v1` |
+| `LLM_API_MODEL` | Model name for LLM | `qwen3-coder-flash` |
+
+### Deploy commands
+
+```bash
+# Navigate to project directory
+cd ~/se-toolkit-lab-7
+
+# Stop any running bot process (from previous nohup deployment)
+pkill -f "bot.py" 2>/dev/null
+
+# Build and start all services (backend, postgres, caddy, bot)
+docker compose --env-file .env.docker.secret up --build -d
+
+# Check all services are running
+docker compose --env-file .env.docker.secret ps
+```
+
+### Verify deployment
+
+```bash
+# Check bot container status
+docker compose --env-file .env.docker.secret ps bot
+
+# View bot logs (look for "Application started" and polling messages)
+docker compose --env-file .env.docker.secret logs bot --tail 20
+
+# Test the bot in Telegram:
+# - Send /start - should see welcome message
+# - Send /health - should see backend status
+# - Send "what labs are available?" - should see LLM-powered response
+```
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Bot container keeps restarting | Missing env var or import error | Check logs: `docker compose logs bot` |
+| `/health` fails but worked before | Wrong `LMS_API_URL` | Use `http://backend:8000` not `localhost:42002` |
+| LLM queries fail | Wrong `LLM_API_BASE_URL` | Use `http://host.docker.internal:42005/v1` |
+| Bot not responding in Telegram | Invalid `BOT_TOKEN` | Verify token from @BotFather |
+
+### Stop and restart
+
+```bash
+# Stop all services
+docker compose --env-file .env.docker.secret down
+
+# Restart after changes
+docker compose --env-file .env.docker.secret up --build -d
+```
